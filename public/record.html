@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>New recording · Framecast</title>
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/app"><span class="brand-dot"></span><span data-workspace-name>Framecast</span></a>
+  <nav><a class="btn btn-ghost" href="/screenshot">Screenshot</a><a class="btn btn-ghost" href="/app">Library</a></nav>
+</header>
+<main class="recorder">
+  <h1>New recording</h1>
+
+  <div id="setup">
+    <div class="modes" role="radiogroup">
+      <button class="mode active" data-mode="screen-cam"><strong>Screen + Camera</strong><span>Camera bubble in the corner</span></button>
+      <button class="mode" data-mode="screen"><strong>Screen only</strong><span>Just your screen and voice</span></button>
+      <button class="mode" data-mode="cam"><strong>Camera only</strong><span>Talk straight to camera</span></button>
+    </div>
+    <div class="devices" style="margin-top:14px">
+      <div class="field" id="cam-field"><label for="cam">Camera</label><select id="cam"></select></div>
+      <div class="field"><label for="mic">Microphone</label><select id="mic"></select></div>
+    </div>
+    <div class="row wrap" id="bubble-opts" style="gap:24px;align-items:flex-start;margin-bottom:6px">
+      <div class="field"><label>Camera position</label><div class="pos-grid" id="pos">
+        <button data-pos="top-left" aria-label="Top left"></button><button data-pos="top-right" aria-label="Top right"></button>
+        <button data-pos="bottom-left" class="active" aria-label="Bottom left"></button><button data-pos="bottom-right" aria-label="Bottom right"></button>
+      </div></div>
+      <div class="field"><label>Camera size</label><div class="seg-inline" id="size">
+        <button data-size="s">Small</button><button data-size="m" class="active">Medium</button><button data-size="l">Large</button>
+      </div></div>
+      <p class="muted small" style="max-width:260px;margin-top:22px">You can change both after recording too.</p>
+    </div>
+    <div class="field"><label for="title">Title (optional)</label><input id="title" placeholder="e.g. Walkthrough of the new onboarding flow" maxlength="200"></div>
+  </div>
+
+  <div class="preview" id="preview">
+    <video id="main-video" autoplay muted playsinline hidden></video>
+    <div class="preview-hint" id="hint">Pick what to record, then press Start. You'll choose a screen, window or tab next. In Chrome or Edge a floating draw pad opens so you can draw on your screen while you talk.</div>
+    <div class="cam-bubble" id="bubble" hidden><video id="cam-video" autoplay muted playsinline></video></div>
+  </div>
+
+  <div class="row" id="start-row">
+    <button class="btn btn-rec btn-lg" id="start">Start recording</button>
+    <label class="check small muted"><input type="checkbox" id="sysaudio" checked> Include tab/system audio when available</label>
+  </div>
+
+  <div class="rec-bar" id="rec-bar" hidden>
+    <span class="rec-time"><span class="rec-dot" id="dot"></span><span id="time">0:00</span></span>
+    <span class="upload-status" id="up-status"></span>
+    <div class="row">
+      <button class="btn" id="padbtn" hidden title="Floating window to draw on your screen while recording">✎ Draw pad</button>
+      <button class="btn" id="pip" hidden>Pop out camera</button>
+      <button class="btn" id="pause">Pause</button>
+      <button class="btn btn-ghost btn-danger" id="cancel">Cancel</button>
+      <button class="btn btn-primary" id="stop">Finish</button>
+    </div>
+  </div>
+  <p class="error" id="err" hidden></p>
+</main>
+<div class="countdown" id="countdown" hidden></div>
+<script src="/static/js/common.js"></script>
+<script src="/static/js/uploader.js"></script>
+<script src="/static/js/drawpad.js"></script>
+<script src="/static/js/record.js"></script>
+</body>
+</html>

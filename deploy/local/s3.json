@@ -1,0 +1,9 @@
+{
+  "identities": [
+    {
+      "name": "framecast",
+      "credentials": [{ "accessKey": "framecast", "secretKey": "framecast-secret" }],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    }
+  ]
+}

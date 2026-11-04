@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in · Framecast</title>
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+<header class="topbar"><a class="brand" href="/"><span class="brand-dot"></span><span id="ws">Framecast</span></a></header>
+<main class="center">
+  <form class="card auth-card" id="form">
+    <h1 id="heading">Sign in</h1>
+    <p class="muted small" id="sub" hidden></p>
+    <p class="error" id="err" hidden></p>
+    <a class="btn btn-lg" id="sso" hidden></a>
+    <div id="pw-fields" style="display:grid;gap:14px">
+      <input id="name" placeholder="Your name" autocomplete="name" hidden>
+      <input id="email" type="email" placeholder="Email" autocomplete="email" required>
+      <input id="password" type="password" placeholder="Password" autocomplete="current-password" required minlength="8">
+      <button class="btn btn-primary" type="submit" id="submit">Sign in</button>
+    </div>
+    <p class="muted small" id="switch" hidden><a href="#" id="toggle">Create an account</a></p>
+  </form>
+</main>
+<script src="/static/js/common.js"></script>
+<script>
+(async () => {
+  const $ = (id) => document.getElementById(id);
+  const qs = new URLSearchParams(location.search);
+  const invite = qs.get('invite');
+  const next = qs.get('next');
+  const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : '/app';
+  const c = await fc.api(`/api/auth/config${invite ? `?invite=${encodeURIComponent(invite)}` : ''}`);
+  if (c.brandColor) document.documentElement.style.setProperty('--accent', c.brandColor);
+  $('ws').textContent = c.workspaceName;
+  document.title = `Sign in · ${c.workspaceName}`;
+
+  const errors = {
+    sso_failed: 'Single sign-on failed. Try again.', sso_expired: 'Sign-in took too long. Try again.',
+    sso_not_allowed: 'Your account isn’t allowed here. Ask an admin for an invite.', sso_no_email: 'Your identity provider didn’t share a verified email.',
+    disabled: 'Your account has been deactivated.',
+  };
+  if (errors[qs.get('error')]) { $('err').textContent = errors[qs.get('error')]; $('err').hidden = false; }
+
+  if (c.sso) {
+    $('sso').hidden = false;
+    $('sso').textContent = `Continue with ${c.sso.label}`;
+    $('sso').href = `/auth/sso?next=${encodeURIComponent(safeNext)}${invite ? `&invite=${encodeURIComponent(invite)}` : ''}`;
+  }
+  $('pw-fields').hidden = !c.passwordLogin;
+
+  let mode = 'login';
+  const setMode = (m) => {
+    mode = m;
+    const signup = m === 'signup';
+    $('heading').textContent = signup ? (c.invite ? `Join ${c.workspaceName}` : 'Create your account') : 'Sign in';
+    $('submit').textContent = signup ? 'Create account' : 'Sign in';
+    $('name').hidden = !signup;
+    $('password').autocomplete = signup ? 'new-password' : 'current-password';
+    $('toggle').textContent = signup ? 'I already have an account' : 'Create an account';
+  };
+  if (c.invite) {
+    $('email').value = c.invite.email;
+    $('sub').textContent = 'You’ve been invited. Set a password, or use single sign-on.';
+    $('sub').hidden = false;
+    setMode('signup');
+  }
+  if (c.signupOpen && c.passwordLogin) $('switch').hidden = false;
+  $('toggle').onclick = (e) => { e.preventDefault(); setMode(mode === 'login' ? 'signup' : 'login'); };
+  $('form').onsubmit = async (e) => {
+    e.preventDefault();
+    $('err').hidden = true;
+    try {
+      await fc.api(`/api/auth/${mode}`, { json: { name: $('name').value, email: $('email').value, password: $('password').value, invite } });
+      location.href = safeNext;
+    } catch (err) {
+      $('err').textContent = err.message;
+      $('err').hidden = false;
+    }
+  };
+})();
+</script>
+</body>
+</html>

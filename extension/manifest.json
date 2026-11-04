@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Framecast",
+  "version": "1.0.0",
+  "description": "Record your screen and camera, or capture an annotated screenshot, with your self-hosted Framecast.",
+  "action": { "default_popup": "popup.html", "default_title": "Framecast" },
+  "options_page": "options.html",
+  "permissions": ["storage"],
+  "background": { "service_worker": "background.js" },
+  "commands": {
+    "record": { "suggested_key": { "default": "Alt+Shift+R" }, "description": "Start a recording" },
+    "screenshot": { "suggested_key": { "default": "Alt+Shift+S" }, "description": "Take a screenshot" }
+  }
+}

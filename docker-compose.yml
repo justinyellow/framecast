@@ -1,0 +1,80 @@
+# Local stack mirroring the ECS layout: web service + worker service (same image),
+# Postgres (RDS), SeaweedFS (S3 stand-in) and Mailpit (catches outgoing email).
+x-app-env: &app-env
+  PUBLIC_URL: http://localhost:3900
+  DATABASE_URL: postgres://framecast:framecast@db:5432/framecast
+  SESSION_SECRET: local-dev-secret-change-me
+  S3_BUCKET: framecast
+  S3_ENDPOINT: http://s3:8333
+  S3_PUBLIC_ENDPOINT: http://localhost:9390
+  S3_FORCE_PATH_STYLE: "true"
+  S3_CREATE_BUCKET: "true"
+  AWS_REGION: us-east-1
+  AWS_ACCESS_KEY_ID: framecast
+  AWS_SECRET_ACCESS_KEY: framecast-secret
+  UPLOAD_MODE: direct
+  ALLOW_SIGNUP: "true"
+  # Local testing: every visit is signed in as this admin. Sign out to browse as a viewer.
+  DEV_AUTO_LOGIN: justin@framecast.local
+  DEV_AUTO_LOGIN_NAME: Justin
+  SMTP_HOST: mail
+  SMTP_PORT: "1025"
+  SMTP_FROM: Framecast <no-reply@framecast.local>
+  # Optional: AI titles, summaries and chapters.
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+
+services:
+  web:
+    build: .
+    # `docker compose pull` uses the published image; `--build` builds from this checkout instead.
+    image: ghcr.io/justinyellow/framecast:latest
+    ports: ["3900:3000"]
+    environment:
+      <<: *app-env
+      ROLE: web
+    depends_on:
+      db: { condition: service_healthy }
+      s3: { condition: service_started }
+    restart: unless-stopped
+
+  worker:
+    image: ghcr.io/justinyellow/framecast:latest
+    environment:
+      <<: *app-env
+      ROLE: worker
+      PROCESS_CONCURRENCY: "2"
+    depends_on:
+      db: { condition: service_healthy }
+      s3: { condition: service_started }
+      web: { condition: service_started }
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: framecast
+      POSTGRES_PASSWORD: framecast
+      POSTGRES_DB: framecast
+    ports: ["5490:5432"]
+    volumes: [db:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U framecast"]
+      interval: 3s
+      retries: 20
+
+  s3:
+    # SeaweedFS as a local S3 stand-in (MinIO images are no longer published on Docker Hub).
+    image: chrislusf/seaweedfs:4.50
+    command: server -dir=/data -s3 -s3.port=8333 -s3.config=/etc/seaweed/s3.json -ip.bind=0.0.0.0
+    ports: ["9390:8333"]
+    volumes:
+      - s3:/data
+      - ./deploy/local/s3.json:/etc/seaweed/s3.json:ro
+
+  mail:
+    image: axllent/mailpit:v1.27
+    ports: ["8126:8025"]
+
+volumes:
+  db:
+  s3:

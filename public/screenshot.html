@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Screenshot · Framecast</title>
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/app"><span class="brand-dot"></span><span data-workspace-name>Framecast</span></a>
+  <nav><a class="btn btn-ghost" href="/record">Record video</a><a class="btn btn-ghost" href="/app">Library</a></nav>
+</header>
+<main class="annotator">
+  <div class="row between wrap">
+    <h1>Screenshot</h1>
+    <div class="row wrap">
+      <button class="btn btn-primary" id="capture">Capture screen</button>
+      <label class="btn" for="open">Open image</label>
+      <input type="file" id="open" accept="image/*" hidden>
+      <span class="muted small">or paste with Ctrl/⌘+V</span>
+    </div>
+  </div>
+  <div class="tools" id="tools" hidden>
+    <button class="tool active" data-tool="arrow">Arrow</button>
+    <button class="tool" data-tool="rect">Box</button>
+    <button class="tool" data-tool="highlight">Highlight</button>
+    <button class="tool" data-tool="pen">Pen</button>
+    <button class="tool" data-tool="text">Text</button>
+    <button class="tool" data-tool="blur">Blur</button>
+    <button class="tool" data-tool="crop">Crop</button>
+    <input type="color" id="color" value="#e5484d" title="Color">
+    <select id="width" title="Thickness" style="width:auto;padding:5px 8px"><option value="3">Thin</option><option value="6" selected>Medium</option><option value="10">Thick</option></select>
+    <span class="grow"></span>
+    <button class="tool" id="undo" title="Undo (Ctrl/⌘+Z)">Undo</button>
+    <input id="title" placeholder="Title (optional)" style="width:220px">
+    <button class="btn btn-primary" id="save">Save &amp; copy link</button>
+  </div>
+  <div class="canvas-wrap" id="wrap">
+    <p class="muted" id="hint" style="padding:60px 20px;text-align:center">Capture a screen, window or tab, then mark it up with arrows, boxes, text and blur.</p>
+    <canvas id="canvas" hidden></canvas>
+  </div>
+  <p class="error" id="err" hidden></p>
+</main>
+<script src="/static/js/common.js"></script>
+<script src="/static/js/annotate.js"></script>
+</body>
+</html>

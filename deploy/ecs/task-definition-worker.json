@@ -1,0 +1,39 @@
+{
+  "family": "framecast-worker",
+  "requiresCompatibilities": ["FARGATE"],
+  "networkMode": "awsvpc",
+  "cpu": "2048",
+  "memory": "4096",
+  "ephemeralStorage": { "sizeInGiB": 60 },
+  "runtimePlatform": { "cpuArchitecture": "X86_64", "operatingSystemFamily": "LINUX" },
+  "executionRoleArn": "arn:aws:iam::ACCOUNT_ID:role/framecast-execution",
+  "taskRoleArn": "arn:aws:iam::ACCOUNT_ID:role/framecast-task",
+  "containerDefinitions": [
+    {
+      "name": "worker",
+      "image": "ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/framecast:latest",
+      "essential": true,
+      "environment": [
+        { "name": "ROLE", "value": "worker" },
+        { "name": "PUBLIC_URL", "value": "https://video.example.com" },
+        { "name": "S3_BUCKET", "value": "framecast-media" },
+        { "name": "AWS_REGION", "value": "REGION" },
+        { "name": "DATABASE_SSL", "value": "true" },
+        { "name": "PROCESS_CONCURRENCY", "value": "1" },
+        { "name": "WHISPER_THREADS", "value": "2" }
+      ],
+      "secrets": [
+        { "name": "DATABASE_URL", "valueFrom": "arn:aws:secretsmanager:REGION:ACCOUNT_ID:secret:framecast/database-url" },
+        { "name": "SESSION_SECRET", "valueFrom": "arn:aws:secretsmanager:REGION:ACCOUNT_ID:secret:framecast/session-secret" },
+        { "name": "ANTHROPIC_API_KEY", "valueFrom": "arn:aws:secretsmanager:REGION:ACCOUNT_ID:secret:framecast/anthropic-api-key" },
+        { "name": "SMTP_HOST", "valueFrom": "arn:aws:secretsmanager:REGION:ACCOUNT_ID:secret:framecast/smtp-host" },
+        { "name": "SMTP_USER", "valueFrom": "arn:aws:secretsmanager:REGION:ACCOUNT_ID:secret:framecast/smtp-user" },
+        { "name": "SMTP_PASS", "valueFrom": "arn:aws:secretsmanager:REGION:ACCOUNT_ID:secret:framecast/smtp-pass" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": { "awslogs-group": "/ecs/framecast", "awslogs-region": "REGION", "awslogs-stream-prefix": "worker" }
+      }
+    }
+  ]
+}

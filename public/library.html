@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Library · Framecast</title>
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/app"><span class="brand-dot"></span><span data-workspace-name>Framecast</span></a>
+  <nav>
+    <label class="btn btn-ghost" for="file" title="Upload videos or images (you can select several, e.g. a Loom export)">Upload</label>
+    <input type="file" id="file" accept="video/*,image/png,image/jpeg,image/webp" multiple hidden>
+    <a class="btn" href="/screenshot">Screenshot</a>
+    <a class="btn btn-primary" href="/record">Record</a>
+    <a class="btn btn-ghost" href="/settings">Settings</a>
+  </nav>
+</header>
+<main class="lib">
+  <nav class="lib-nav" id="nav"></nav>
+  <section>
+    <div class="library-head">
+      <h1 id="heading">My library</h1>
+      <input type="search" id="q" placeholder="Search titles, summaries and transcripts">
+    </div>
+    <div class="dropzone" id="drop" hidden>Drop videos or images to upload</div>
+    <p class="upload-status" id="upload-status" hidden></p>
+    <div class="grid" id="grid"></div>
+    <div class="empty" id="empty" hidden>
+      <h2>Nothing here yet</h2>
+      <p>Record your screen and camera, or grab an annotated screenshot.</p>
+      <div class="row" style="justify-content:center"><a class="btn btn-primary btn-lg" href="/record">Start recording</a><a class="btn btn-lg" href="/screenshot">Take a screenshot</a></div>
+    </div>
+  </section>
+</main>
+<script src="/static/js/common.js"></script>
+<script src="/static/js/uploader.js"></script>
+<script src="/static/js/library.js"></script>
+</body>
+</html>
