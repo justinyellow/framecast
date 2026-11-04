@@ -132,3 +132,9 @@ These need a desktop app or an outside app registration:
 - Background blur for the camera
 - A native Teams messaging extension (needs an Azure Bot registration; links still unfurl in Teams through Open Graph)
 - Caption translation
+
+## License and contributions
+
+MIT licensed (see `LICENSE`): you can run, modify and self-host it, including commercially.
+
+The project is maintained by its author. Pull requests from outside contributors aren't accepted, but you're welcome to open an issue or fork it.
