@@ -17,7 +17,14 @@ const ROLES = ['admin', 'member', 'viewer'];
 // ---------- Workspace settings ----------
 router.get('/api/admin/settings', admin, wrap(async (_req, res) => {
   const ws = await settings.get();
-  res.json({ ...ws, logoUrl: ws.logoKey ? '/brand/logo' : null, smtpConfigured: !!config.smtp, ssoConfigured: !!config.oidc });
+  const o = config.oidc;
+  res.json({
+    ...ws, logoUrl: ws.logoKey ? '/brand/logo' : null, smtpConfigured: !!config.smtp,
+    sso: o ? {
+      provider: o.provider, redirectUrl: `${config.publicUrl}${o.redirectPath}`, allowedDomains: o.allowedDomains,
+      groupsClaim: o.groupsClaim, roleGroups: o.roleGroups, mapsRoles: o.mapsRoles, requireGroup: o.requireGroup,
+    } : null,
+  });
 }));
 
 router.patch('/api/admin/settings', admin, json, wrap(async (req, res) => {

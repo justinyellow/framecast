@@ -22,7 +22,7 @@ router.get('/api/auth/config', wrap(async (req, res) => {
   res.json({
     signupOpen: (await noUsers()) || config.allowSignup || !!invite,
     passwordLogin: passwordLogin() || (await noUsers()),
-    sso: config.oidc ? { label: config.oidc.label } : null,
+    sso: config.oidc ? { label: config.oidc.label, provider: config.oidc.provider } : null,
     invite: invite ? { email: invite.email } : null,
     workspaceName: ws.workspaceName,
     brandColor: ws.brandColor,
@@ -70,10 +70,12 @@ router.post('/api/auth/login', json, wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
-router.post('/api/auth/logout', (_req, res) => {
+router.post('/api/auth/logout', (req, res) => {
   res.clearCookie('fc_sid', { path: '/' });
   if (config.devAutoLogin) res.cookie('fc_no_auto', '1', auth.cookieOpts(864e5));
-  res.json({ ok: true });
+  // SSO users also end their session at the provider, so "Sign out" doesn't bounce straight back in.
+  const ssoUser = req.user?.sso_subject && config.oidc?.logoutUrl;
+  res.json({ ok: true, redirect: ssoUser ? config.oidc.logoutUrl : '/login' });
 });
 
 router.get('/api/me', auth.requireUser, (req, res) => res.json(req.user));
@@ -98,17 +100,22 @@ router.patch('/api/me', auth.requireUser, json, wrap(async (req, res) => {
   res.json(await db.one(`SELECT ${auth.USER_COLS} FROM users WHERE id = $1`, [req.user.id]));
 }));
 
-// ---------- OIDC single sign-on (Google Workspace, Microsoft Entra ID, Okta, ...) ----------
+// ---------- Single sign-on: Cognito, Google, or any OIDC provider (see src/sso-config.js) ----------
+const sso = require('../sso-config');
+
 let oidcConfig = null;
 async function oidc() {
   const client = await import('openid-client');
   if (!oidcConfig) {
-    const opts = config.oidc.issuer.startsWith('http://') ? { execute: [client.allowInsecureRequests] } : undefined;
-    oidcConfig = await client.discovery(new URL(config.oidc.issuer), config.oidc.clientId, config.oidc.clientSecret, undefined, opts);
+    const o = config.oidc;
+    const opts = o.issuer.startsWith('http://') ? { execute: [client.allowInsecureRequests] } : undefined;
+    // No secret = public client (e.g. Cognito app clients without a secret); PKCE protects the code exchange.
+    oidcConfig = await client.discovery(new URL(o.issuer), o.clientId, o.clientSecret || undefined, o.clientSecret ? undefined : client.None(), opts);
   }
   return { client, cfg: oidcConfig };
 }
-const redirectUri = () => `${config.publicUrl}/auth/sso/callback`;
+const redirectUri = () => `${config.publicUrl}${config.oidc.redirectPath}`;
+const verified = (v) => !(v === false || v === 'false');
 
 router.get('/auth/sso', wrap(async (req, res) => {
   if (!config.oidc) return res.status(404).send('SSO is not configured');
@@ -119,8 +126,9 @@ router.get('/auth/sso', wrap(async (req, res) => {
   const next = typeof req.query.next === 'string' && req.query.next.startsWith('/') && !req.query.next.startsWith('//') ? req.query.next : '/app';
   res.cookie('fc_sso', auth.sign({ verifier, state, nonce, next, invite: req.query.invite || null, exp: Date.now() + 600000 }), auth.cookieOpts(600000));
   const url = client.buildAuthorizationUrl(cfg, {
+    ...config.oidc.authParams,
     redirect_uri: redirectUri(),
-    scope: 'openid email profile',
+    scope: config.oidc.scope,
     code_challenge: await client.calculatePKCECodeChallenge(verifier),
     code_challenge_method: 'S256',
     state,
@@ -129,10 +137,15 @@ router.get('/auth/sso', wrap(async (req, res) => {
   res.redirect(url.href);
 }));
 
-router.get('/auth/sso/callback', wrap(async (req, res) => {
+async function ssoCallback(req, res) {
   if (!config.oidc) return res.status(404).send('SSO is not configured');
+  const o = config.oidc;
   const pending = auth.verify(req.cookies.fc_sso);
   res.clearCookie('fc_sso', { path: '/' });
+  if (req.query.error) {
+    console.error('SSO provider returned an error:', req.query.error, req.query.error_description);
+    return res.redirect('/login?error=sso_failed');
+  }
   if (!pending) return res.redirect('/login?error=sso_expired');
   const { client, cfg } = await oidc();
   const current = new URL(req.originalUrl, config.publicUrl);
@@ -147,28 +160,48 @@ router.get('/auth/sso/callback', wrap(async (req, res) => {
     return res.redirect('/login?error=sso_failed');
   }
   const email = String(claims.email || '').toLowerCase();
-  if (!email || claims.email_verified === false) return res.redirect('/login?error=sso_no_email');
+  if (!email || !verified(claims.email_verified)) return res.redirect('/login?error=sso_no_email');
   const domain = email.split('@')[1];
+  const domainOk = !o.allowedDomains.length || o.allowedDomains.includes(domain);
+  const groups = sso.groupsFrom(o, claims);
+  const groupRole = o.mapsRoles ? sso.roleFor(o, groups) : null;
   const invite = await validInvite(pending.invite);
+  const first = await noUsers();
+
+  // Group membership is the source of truth when mapping is on: no matching group, no access.
+  if (o.requireGroup && !groupRole && !first) {
+    audit({ ip: req.ip }, 'auth.sso_denied', { type: 'user', id: email }, { reason: 'no_group', groups });
+    return res.redirect('/login?error=sso_no_group');
+  }
 
   let user = await db.one('SELECT * FROM users WHERE sso_subject = $1 OR lower(email) = $2 ORDER BY (sso_subject = $1) DESC LIMIT 1', [claims.sub, email]);
   if (user?.disabled) return res.redirect('/login?error=disabled');
   if (!user) {
-    const domainOk = !config.oidc.allowedDomains.length || config.oidc.allowedDomains.includes(domain);
-    const first = await noUsers();
-    if (!first && !invite && !(config.oidc.autoProvision && domainOk)) return res.redirect('/login?error=sso_not_allowed');
+    if (!first && !invite && !(o.autoProvision && domainOk)) {
+      audit({ ip: req.ip }, 'auth.sso_denied', { type: 'user', id: email }, { reason: domainOk ? 'no_invite' : 'domain' });
+      return res.redirect('/login?error=sso_not_allowed');
+    }
+    const role = first ? 'admin' : groupRole || invite?.role || o.defaultRole;
     user = await db.one(
       `INSERT INTO users (email, name, role, sso_subject) VALUES ($1, $2, $3, $4) RETURNING *`,
-      [email, String(claims.name || email.split('@')[0]).slice(0, 80), first ? 'admin' : invite?.role || 'member', claims.sub],
+      [email, String(claims.name || claims.given_name || email.split('@')[0]).slice(0, 80), role, claims.sub],
     );
     if (invite) await db.query('UPDATE invites SET accepted_at = now() WHERE token = $1', [invite.token]);
-    audit({ user, ip: req.ip }, 'user.signup', { type: 'user', id: user.id }, { via: 'sso' });
-  } else if (!user.sso_subject) {
-    await db.query('UPDATE users SET sso_subject = $2 WHERE id = $1', [user.id, claims.sub]);
+    audit({ user, ip: req.ip }, 'user.signup', { type: 'user', id: user.id }, { via: 'sso', provider: o.provider, role });
+  } else {
+    if (!user.sso_subject) await db.query('UPDATE users SET sso_subject = $2 WHERE id = $1', [user.id, claims.sub]);
+    if (groupRole && groupRole !== user.role) {
+      await db.query('UPDATE users SET role = $2 WHERE id = $1', [user.id, groupRole]);
+      audit({ user, ip: req.ip }, 'member.role_synced', { type: 'user', id: user.id }, { from: user.role, to: groupRole, groups });
+    }
   }
   auth.setSession(res, user.id);
-  audit({ user, ip: req.ip }, 'auth.login', { type: 'user', id: user.id }, { via: 'sso' });
+  res.clearCookie('fc_no_auto', { path: '/' });
+  audit({ user, ip: req.ip }, 'auth.login', { type: 'user', id: user.id }, { via: 'sso', provider: o.provider });
   res.redirect(pending.next || '/app');
-}));
+}
+
+router.get('/auth/sso/callback', wrap(ssoCallback));
+if (config.oidc && config.oidc.redirectPath !== '/auth/sso/callback') router.get(config.oidc.redirectPath, wrap(ssoCallback));
 
 module.exports = router;
