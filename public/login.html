@@ -40,13 +40,14 @@
   const errors = {
     sso_failed: 'Single sign-on failed. Try again.', sso_expired: 'Sign-in took too long. Try again.',
     sso_not_allowed: 'Your account isn’t allowed here. Ask an admin for an invite.', sso_no_email: 'Your identity provider didn’t share a verified email.',
+    sso_no_group: 'You’re not in a group that has access. Ask an admin to add you.',
     disabled: 'Your account has been deactivated.',
   };
   if (errors[qs.get('error')]) { $('err').textContent = errors[qs.get('error')]; $('err').hidden = false; }
 
   if (c.sso) {
     $('sso').hidden = false;
-    $('sso').textContent = `Continue with ${c.sso.label}`;
+    $('sso').textContent = c.sso.label;
     $('sso').href = `/auth/sso?next=${encodeURIComponent(safeNext)}${invite ? `&invite=${encodeURIComponent(invite)}` : ''}`;
   }
   $('pw-fields').hidden = !c.passwordLogin;
