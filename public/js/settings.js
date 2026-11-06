@@ -165,9 +165,7 @@
         <table style="margin-top:14px"><thead><tr><th>URL</th><th>Events</th><th></th></tr></thead><tbody>
         ${wh.webhooks.map((w) => `<tr><td>${fc.esc(w.url)}</td><td class="small">${w.events.join(', ')}</td><td><button class="btn btn-sm btn-danger" data-del="${w.id}">Delete</button></td></tr>`).join('') || '<tr><td colspan="3" class="muted">None yet.</td></tr>'}
         </tbody></table></section>
-        <section><h2>Single sign-on</h2>${s.sso ? `<p class="small">Enabled: <b>${fc.esc(s.sso.provider)}</b> · redirect URL <code>${fc.esc(s.sso.redirectUrl)}</code>${s.sso.allowedDomains.length ? ` · domains ${fc.esc(s.sso.allowedDomains.join(', '))}` : ''}</p>
-          ${s.sso.mapsRoles ? `<p class="small muted">Roles come from the <code>${fc.esc(s.sso.groupsClaim)}</code> claim and are re-synced at each sign-in: admin ← ${fc.esc(s.sso.roleGroups.admin.join(', ') || '–')}, member ← ${fc.esc(s.sso.roleGroups.member.join(', ') || '–')}, viewer ← ${fc.esc(s.sso.roleGroups.viewer.join(', ') || '–')}.${s.sso.requireGroup ? ' People in none of these groups are refused.' : ''}</p>` : '<p class="small muted">No group mapping: new SSO users get the default role, and you manage roles on the Members page.</p>'}`
-          : '<p class="muted small">SSO is off. Set <code>OIDC_PROVIDER</code> to <code>cognito</code> (AWS Cognito user pool), <code>google</code> (Google accounts, optionally limited to your Workspace) or point <code>OIDC_ISSUER</code> at any OpenID Connect provider. See the README.</p>'}</section>`;
+        <section><h2>Single sign-on</h2><p class="muted small">${s.ssoConfigured ? 'SSO is enabled.' : 'SSO is off.'} Configure an OIDC app in Google Workspace, Microsoft Entra ID or Okta with redirect URL <code>${location.origin}/auth/sso/callback</code>, then set <code>OIDC_ISSUER</code>, <code>OIDC_CLIENT_ID</code>, <code>OIDC_CLIENT_SECRET</code> and optionally <code>OIDC_ALLOWED_DOMAINS</code>.</p></section>`;
       $('chat-save').onclick = async () => {
         try {
           await api('/api/admin/settings', { method: 'PATCH', json: { chatWebhookUrl: $('chat-url').value.trim() || null, chatNotifyNewVideo: $('chat-new').checked, chatNotifyComment: $('chat-comment').checked } });
@@ -215,7 +213,7 @@
     },
   };
 
-  $('logout').onclick = async () => { const r = await api('/api/auth/logout', { method: 'POST' }); location.href = r.redirect || '/login'; };
+  $('logout').onclick = async () => { await api('/api/auth/logout', { method: 'POST' }); location.href = '/login'; };
 
   (async () => {
     cfg = await fc.brand();
