@@ -58,7 +58,7 @@ To get AI titles, summaries and chapters, export `ANTHROPIC_API_KEY` before runn
 
 **Teams and admin**
 - One workspace with admin, member and viewer roles; email invites; shared folders; and a team library with search across titles, summaries and transcripts.
-- SSO through OIDC (Google Workspace, Microsoft Entra ID, Okta), with optional auto-provisioning limited to your email domain.
+- Single sign-on with AWS Cognito, Google accounts (limited to your Workspace domains), or any OIDC provider. Cognito or IdP groups map to roles and re-sync at each sign-in.
 - Insights: views, unique viewers, average % watched, a retention curve, named viewer list and CSV export.
 - Notifications:
   - Email for comments, first view and processing finished.
@@ -88,7 +88,7 @@ viewers ◀── 302 to presigned S3 URL (or CloudFront signed URL)
 | Var | Notes |
 | --- | --- |
 | `ROLE` | `web`, `worker` or `all` (default) |
-| `PUBLIC_URL` | External base URL, e.g. `https://video.example.com` |
+| `PUBLIC_URL` (or `APP_URL`) | External base URL, e.g. `https://video.example.com` |
 | `DATABASE_URL`, `DATABASE_SSL` | Postgres; `DATABASE_SSL=true` for RDS |
 | `SESSION_SECRET` | Long random string |
 | `S3_BUCKET`, `AWS_REGION` | On AWS, credentials come from the task role |
@@ -96,11 +96,42 @@ viewers ◀── 302 to presigned S3 URL (or CloudFront signed URL)
 | `CLOUDFRONT_DOMAIN`, `CLOUDFRONT_KEY_PAIR_ID`, `CLOUDFRONT_PRIVATE_KEY` | Optional: serve playback through CloudFront signed URLs |
 | `S3_ENDPOINT`, `S3_PUBLIC_ENDPOINT`, `S3_FORCE_PATH_STYLE`, `S3_CREATE_BUCKET` | Local or non-AWS S3 only |
 | `ALLOW_SIGNUP` | `true` = open sign-up. Otherwise it's invite-only after the first user |
-| `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_LABEL`, `OIDC_ALLOWED_DOMAINS`, `OIDC_AUTO_PROVISION`, `DISABLE_PASSWORD_LOGIN` | SSO. Redirect URL: `<PUBLIC_URL>/auth/sso/callback`. Admins can still use a password if SSO breaks |
+| `OIDC_*`, `COGNITO_*`, `GOOGLE_*` | Single sign-on. See [Single sign-on](#single-sign-on) |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | Email (SES SMTP works) |
 | `ANTHROPIC_API_KEY`, `AI_SUMMARIES`, `AI_MODEL` | AI summaries; defaults to `claude-opus-5-5` |
 | `TRANSCRIBE`, `WHISPER_MODEL`, `WHISPER_THREADS` | Transcription. Build with `--build-arg WHISPER_MODEL=small.en` for higher accuracy |
 | `PROCESS_CONCURRENCY` | Parallel jobs per worker task |
+
+## Single sign-on
+
+Pick one provider. Everyone who signs in through it gets an account automatically (limit who with domains or groups below). Password login stays available for admins as a fallback.
+
+**AWS Cognito** (`OIDC_PROVIDER=cognito`, or just set the `COGNITO_*` variables):
+
+| Var | Notes |
+| --- | --- |
+| `COGNITO_USER_POOL_ID`, `COGNITO_CLIENT_ID`, `COGNITO_REGION` (or `AWS_REGION`) | The app client may have no secret (public client); PKCE is always used |
+| `COGNITO_CLIENT_SECRET` | Only if the app client has one |
+| `COGNITO_DOMAIN` | Hosted UI domain; enables sign-out at Cognito too |
+| `COGNITO_IDENTITY_PROVIDER` | e.g. your Google IdP's name in the pool, to skip the hosted UI and go straight to Google |
+
+Register `<PUBLIC_URL>/callback` as the app client's callback URL and `<PUBLIC_URL>/login` as its sign-out URL, with scopes `openid email profile`. Groups come from `cognito:groups`.
+
+**Google accounts directly** (`OIDC_PROVIDER=google`): create an OAuth client (Web application) in Google Cloud with redirect URI `<PUBLIC_URL>/auth/sso/callback`, then set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and `GOOGLE_WORKSPACE_DOMAINS=yourcompany.com` so only your Workspace accounts get in.
+
+**Any other OIDC provider** (Microsoft Entra ID, Okta, Keycloak…): `OIDC_ISSUER`, `OIDC_CLIENT_ID`, optional `OIDC_CLIENT_SECRET`. Redirect URI `<PUBLIC_URL>/auth/sso/callback`.
+
+**Options for all providers:**
+
+| Var | Notes |
+| --- | --- |
+| `OIDC_ADMIN_GROUPS`, `OIDC_MEMBER_GROUPS`, `OIDC_VIEWER_GROUPS` | Comma-separated group names mapped to roles. When set, roles are re-synced at every sign-in and people in none of the groups are refused (`OIDC_REQUIRE_GROUP=false` lets them in with `OIDC_DEFAULT_ROLE`) |
+| `OIDC_GROUPS_CLAIM` | Token claim holding groups (default `cognito:groups` for Cognito, `groups` otherwise) |
+| `OIDC_ALLOWED_DOMAINS` | Only these email domains get accounts automatically (others need an invite) |
+| `OIDC_DEFAULT_ROLE` | Role for new users without group mapping: `member` (default) or `viewer` |
+| `OIDC_AUTO_PROVISION` | `false` = invite-only even through SSO |
+| `DISABLE_PASSWORD_LOGIN` | `true` = SSO only (admins keep password login as a break-glass) |
+| `OIDC_LABEL`, `OIDC_SCOPE`, `OIDC_AUTH_PARAMS`, `OIDC_REDIRECT_PATH`, `OIDC_LOGOUT_URL` | Button text, scopes, extra authorize parameters (`a=b&c=d`), callback path, and the provider sign-out URL |
 
 ## Deploying to ECS (Fargate)
 

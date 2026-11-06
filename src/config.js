@@ -5,11 +5,14 @@ const required = (name, fallback) => {
 };
 const bool = (name, dflt = false) => (process.env[name] === undefined ? dflt : process.env[name] === 'true');
 
+// APP_URL is accepted as an alias so platforms that inject it (instead of PUBLIC_URL) work as-is.
+const publicUrl = required('PUBLIC_URL', process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '');
+
 module.exports = {
   port: Number(process.env.PORT || 3000),
   // web: HTTP only. worker: jobs only. all: both (local/dev, small deployments).
   role: process.env.ROLE || 'all',
-  publicUrl: required('PUBLIC_URL', 'http://localhost:3000').replace(/\/$/, ''),
+  publicUrl,
   databaseUrl: required('DATABASE_URL'),
   sessionSecret: required('SESSION_SECRET'),
   allowSignup: bool('ALLOW_SIGNUP'),
@@ -32,15 +35,8 @@ module.exports = {
     keyPairId: required('CLOUDFRONT_KEY_PAIR_ID'),
     privateKey: required('CLOUDFRONT_PRIVATE_KEY').replace(/\\n/g, '\n'),
   } : null,
-  oidc: process.env.OIDC_ISSUER ? {
-    issuer: process.env.OIDC_ISSUER,
-    clientId: required('OIDC_CLIENT_ID'),
-    clientSecret: process.env.OIDC_CLIENT_SECRET,
-    label: process.env.OIDC_LABEL || 'Single sign-on',
-    allowedDomains: (process.env.OIDC_ALLOWED_DOMAINS || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
-    autoProvision: bool('OIDC_AUTO_PROVISION', true),
-    disablePasswordLogin: bool('DISABLE_PASSWORD_LOGIN'),
-  } : null,
+  // Single sign-on: Cognito, Google or any OIDC provider. See src/sso-config.js.
+  oidc: require('./sso-config').load(publicUrl),
   smtp: process.env.SMTP_HOST ? {
     host: process.env.SMTP_HOST,
     port: Number(process.env.SMTP_PORT || 587),
